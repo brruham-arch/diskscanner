@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0A0A">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#121212"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="💾 Disk Scanner"
+            android:textSize="22sp"
+            android:textColor="#FFFFFF"
+            android:fontFamily="sans-serif-medium"/>
+
+        <TextView
+            android:id="@+id/tvShizukuStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏳ Cek Shizuku..."
+            android:textSize="12sp"
+            android:textColor="#999999"
+            android:layout_marginTop="4dp"/>
+
+        <!-- Storage bar -->
+        <TextView
+            android:id="@+id/tvStorageInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Menghitung..."
+            android:textSize="12sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginTop="12dp"/>
+
+        <ProgressBar
+            android:id="@+id/storageBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:layout_marginTop="6dp"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="#E53935"
+            android:progressBackgroundTint="#2A2A2A"/>
+
+    </LinearLayout>
+
+    <!-- Chips filter -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0F0F0F"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipSdcard"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📱 Internal"
+                android:layout_marginEnd="6dp"
+                app:chipBackgroundColor="#1E1E1E"
+                android:textColor="#FFFFFF"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipAndroidData"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔒 Android/data"
+                android:layout_marginEnd="6dp"
+                app:chipBackgroundColor="#1E1E1E"
+                android:textColor="#FFFFFF"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipObb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎮 OBB"
+                android:layout_marginEnd="6dp"
+                app:chipBackgroundColor="#1E1E1E"
+                android:textColor="#FFFFFF"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipDownload"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⬇️ Download"
+                app:chipBackgroundColor="#1E1E1E"
+                android:textColor="#FFFFFF"/>
+
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Current path -->
+    <TextView
+        android:id="@+id/tvCurrentPath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="/sdcard"
+        android:textSize="11sp"
+        android:textColor="#555555"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="6dp"
+        android:background="#0A0A0A"
+        android:ellipsize="start"
+        android:singleLine="true"/>
+
+    <!-- List -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="16dp"/>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+</LinearLayout>

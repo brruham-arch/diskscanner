@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bar_red">#F44336</color>
+    <color name="bar_orange">#FF9800</color>
+    <color name="bar_yellow">#FFC107</color>
+    <color name="bar_green">#4CAF50</color>
+</resources>
