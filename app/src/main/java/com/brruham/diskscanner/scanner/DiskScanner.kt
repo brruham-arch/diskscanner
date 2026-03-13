@@ -10,26 +10,13 @@ object DiskScanner {
 
     suspend fun scanPath(path: String): List<FileItem> = withContext(Dispatchers.IO) {
         val items = mutableListOf<FileItem>()
-        val useShizuku = ShizukuHelper.isGranted()
+        val dir = File(path)
 
-        if (useShizuku) {
-            // List via shell — cepat, bisa baca Android/data
-            val output = ShizukuHelper.exec("ls \"$path\" 2>/dev/null") ?: ""
-            output.lines().filter { it.isNotBlank() }.forEach { name ->
-                val fullPath = "$path/$name"
-                // Ukuran awal 0, akan di-update lazy
-                val isDir = ShizukuHelper.exec("[ -d \"$fullPath\" ] && echo dir || echo file")
-                    ?.trim() == "dir"
-                items.add(FileItem(
-                    path = fullPath,
-                    name = name,
-                    size = 0L,
-                    isDirectory = isDir
-                ))
-            }
-        } else {
-            // Java File API — cepat tapi tidak bisa Android/data
-            File(path).listFiles()?.forEach { file ->
+        // Coba baca via Java File API dulu
+        val files = try { dir.listFiles() } catch (e: Exception) { null }
+
+        if (!files.isNullOrEmpty()) {
+            files.forEach { file ->
                 items.add(FileItem(
                     path = file.absolutePath,
                     name = file.name,
@@ -37,31 +24,47 @@ object DiskScanner {
                     isDirectory = file.isDirectory
                 ))
             }
+        } else if (ShizukuHelper.isGranted()) {
+            // Fallback Shizuku untuk folder yang tidak bisa dibaca (Android/data)
+            val output = ShizukuHelper.execAsShell("ls \"$path\" 2>/dev/null") ?: ""
+            output.lines().filter { it.isNotBlank() }.forEach { name ->
+                val fullPath = "$path/$name"
+                items.add(FileItem(
+                    path = fullPath,
+                    name = name,
+                    size = 0L,
+                    isDirectory = true
+                ))
+            }
         }
 
         items
     }
 
-    // Hitung ukuran 1 item saja — dipanggil lazy per item
     suspend fun getSizeOf(path: String, useShizuku: Boolean): Long = withContext(Dispatchers.IO) {
         try {
-            if (useShizuku) {
-                val out = ShizukuHelper.exec("du -sk \"$path\" 2>/dev/null") ?: return@withContext 0L
-                out.trim().split(Regex("\\s+")).firstOrNull()?.toLongOrNull()?.times(1024) ?: 0L
-            } else {
-                val f = File(path)
-                if (f.isFile) f.length()
-                else f.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            val f = File(path)
+            if (f.exists() && f.canRead()) {
+                if (f.isFile) return@withContext f.length()
+                // Hitung rekursif via Java
+                var total = 0L
+                f.walkTopDown().forEach { if (it.isFile) total += it.length() }
+                return@withContext total
             }
+            // Tidak bisa baca — coba Shizuku
+            if (useShizuku) {
+                val out = ShizukuHelper.execAsShell("du -sk \"$path\" 2>/dev/null") ?: return@withContext 0L
+                out.trim().split(Regex("\\s+")).firstOrNull()?.toLongOrNull()?.times(1024) ?: 0L
+            } else 0L
         } catch (e: Exception) { 0L }
     }
 
     suspend fun deleteItem(path: String): Boolean = withContext(Dispatchers.IO) {
+        val f = File(path)
+        if (f.exists()) return@withContext f.deleteRecursively()
         if (ShizukuHelper.isGranted()) {
-            ShizukuHelper.deleteFile(path)
-        } else {
-            File(path).deleteRecursively()
-        }
+            ShizukuHelper.execAsShell("rm -rf \"$path\"") != null
+        } else false
     }
 
     fun getTotalAndFree(): Pair<Long, Long> {
