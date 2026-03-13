@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
             },
             onDeleteClick = { item -> confirmDelete(item) }
         )
+        binding.recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
     }
 
