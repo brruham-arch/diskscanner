@@ -8,6 +8,7 @@ import java.io.File
 
 object DiskScanner {
 
+    // Phase 1: list cepat, size = 0 dulu
     suspend fun scanPath(path: String): List<FileItem> = withContext(Dispatchers.IO) {
         val items = mutableListOf<FileItem>()
         val dir = File(path)
@@ -15,48 +16,42 @@ object DiskScanner {
 
         if (!files.isNullOrEmpty()) {
             files.forEach { file ->
-                // Langsung hitung ukuran saat scan
-                val size = if (file.isFile) {
-                    file.length()
-                } else {
-                    calcDirSize(file)
-                }
                 items.add(FileItem(
                     path = file.absolutePath,
                     name = file.name,
-                    size = size,
+                    size = if (file.isFile) file.length() else 0L,
                     isDirectory = file.isDirectory
                 ))
             }
         } else if (ShizukuHelper.isGranted()) {
-            // Android/data — pakai Shizuku
             val output = ShizukuHelper.execAsShell("ls \"$path\" 2>/dev/null") ?: ""
             output.lines().filter { it.isNotBlank() }.forEach { name ->
-                val fullPath = "$path/$name"
-                val size = ShizukuHelper.execAsShell(
-                    "du -sk \"$fullPath\" 2>/dev/null | cut -f1"
-                )?.trim()?.toLongOrNull()?.times(1024) ?: 0L
                 items.add(FileItem(
-                    path = fullPath,
+                    path = "$path/$name",
                     name = name,
-                    size = size,
+                    size = 0L,
                     isDirectory = true
                 ))
             }
         }
-
-        // Urutkan terbesar dulu
-        items.sortedByDescending { it.size }
+        items
     }
 
-    private fun calcDirSize(dir: File): Long {
-        var total = 0L
+    // Phase 2: hitung size 1 folder, dipanggil lazy per item
+    suspend fun getDirSize(path: String): Long = withContext(Dispatchers.IO) {
         try {
-            dir.walkTopDown()
-                .onEnter { it.canRead() }
-                .forEach { if (it.isFile) total += it.length() }
-        } catch (e: Exception) {}
-        return total
+            if (ShizukuHelper.isGranted()) {
+                val out = ShizukuHelper.execAsShell("du -sk \"$path\" 2>/dev/null | cut -f1") ?: return@withContext 0L
+                out.trim().toLongOrNull()?.times(1024) ?: 0L
+            } else {
+                var total = 0L
+                File(path).walkTopDown()
+                    .onEnter { it.canRead() }
+                    .filter { it.isFile }
+                    .forEach { total += it.length() }
+                total
+            }
+        } catch (e: Exception) { 0L }
     }
 
     suspend fun deleteItem(path: String): Boolean = withContext(Dispatchers.IO) {
