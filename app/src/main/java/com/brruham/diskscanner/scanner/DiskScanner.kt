@@ -8,74 +8,52 @@ import java.io.File
 
 object DiskScanner {
 
-    // Root paths yang akan di-scan
-    val SCAN_ROOTS = listOf(
-        "/sdcard",
-        "/sdcard/Android/data",
-        "/sdcard/Android/obb",
-        "/sdcard/Download",
-        "/sdcard/DCIM",
-        "/sdcard/Pictures",
-        "/sdcard/Movies",
-        "/sdcard/Music"
-    )
-
     suspend fun scanPath(path: String): List<FileItem> = withContext(Dispatchers.IO) {
         val items = mutableListOf<FileItem>()
         val useShizuku = ShizukuHelper.isGranted()
 
         if (useShizuku) {
-            // Pakai Shizuku — bisa baca Android/data
-            scanViaShizuku(path, items)
+            // List via shell — cepat, bisa baca Android/data
+            val output = ShizukuHelper.exec("ls \"$path\" 2>/dev/null") ?: ""
+            output.lines().filter { it.isNotBlank() }.forEach { name ->
+                val fullPath = "$path/$name"
+                // Ukuran awal 0, akan di-update lazy
+                val isDir = ShizukuHelper.exec("[ -d \"$fullPath\" ] && echo dir || echo file")
+                    ?.trim() == "dir"
+                items.add(FileItem(
+                    path = fullPath,
+                    name = name,
+                    size = 0L,
+                    isDirectory = isDir
+                ))
+            }
         } else {
-            // Fallback biasa
-            scanViaJava(File(path), items)
+            // Java File API — cepat tapi tidak bisa Android/data
+            File(path).listFiles()?.forEach { file ->
+                items.add(FileItem(
+                    path = file.absolutePath,
+                    name = file.name,
+                    size = 0L,
+                    isDirectory = file.isDirectory
+                ))
+            }
         }
 
-        // Urutkan terbesar → terkecil
-        items.sortByDescending { it.size }
         items
     }
 
-    private fun scanViaShizuku(path: String, items: MutableList<FileItem>) {
-        val output = ShizukuHelper.listWithSize(path) ?: return
-        output.lines().forEach { line ->
-            if (line.isBlank()) return@forEach
-            val parts = line.trim().split("\t")
-            if (parts.size < 2) return@forEach
-            val sizeKb = parts[0].toLongOrNull() ?: return@forEach
-            val filePath = parts[1].trim()
-            val file = File(filePath)
-            items.add(FileItem(
-                path = filePath,
-                name = file.name,
-                size = sizeKb * 1024,
-                isDirectory = true, // du output always dirs
-                childCount = 0
-            ))
-        }
-    }
-
-    private fun scanViaJava(dir: File, items: MutableList<FileItem>) {
-        if (!dir.exists() || !dir.canRead()) return
-        dir.listFiles()?.forEach { file ->
-            val size = if (file.isDirectory) calculateDirSize(file) else file.length()
-            items.add(FileItem(
-                path = file.absolutePath,
-                name = file.name,
-                size = size,
-                isDirectory = file.isDirectory,
-                childCount = if (file.isDirectory) file.listFiles()?.size ?: 0 else 0
-            ))
-        }
-    }
-
-    private fun calculateDirSize(dir: File): Long {
-        var size = 0L
-        dir.walkTopDown().forEach { file ->
-            if (file.isFile) size += file.length()
-        }
-        return size
+    // Hitung ukuran 1 item saja — dipanggil lazy per item
+    suspend fun getSizeOf(path: String, useShizuku: Boolean): Long = withContext(Dispatchers.IO) {
+        try {
+            if (useShizuku) {
+                val out = ShizukuHelper.exec("du -sk \"$path\" 2>/dev/null") ?: return@withContext 0L
+                out.trim().split(Regex("\\s+")).firstOrNull()?.toLongOrNull()?.times(1024) ?: 0L
+            } else {
+                val f = File(path)
+                if (f.isFile) f.length()
+                else f.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            }
+        } catch (e: Exception) { 0L }
     }
 
     suspend fun deleteItem(path: String): Boolean = withContext(Dispatchers.IO) {
@@ -87,7 +65,7 @@ object DiskScanner {
     }
 
     fun getTotalAndFree(): Pair<Long, Long> {
-        val file = File("/sdcard")
-        return Pair(file.totalSpace, file.freeSpace)
+        val f = File("/sdcard")
+        return Pair(f.totalSpace, f.freeSpace)
     }
 }
